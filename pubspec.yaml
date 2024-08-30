@@ -15,6 +15,7 @@ dependencies:
   # Firebase dependencies
   firebase_core: ^2.32.0
   firebase_auth: ^4.8.1
+  cupertino_icons: ^1.0.8
 
   # Add other dependencies as required by your project
   # Example:
@@ -31,7 +32,4 @@ flutter:
 
   assets:
     - assets/
-    # Puedes agregar tus carpetas de assets aquí
-    # Ejemplo:
-    # - assets/images/
-    # - assets/icons/
+  
