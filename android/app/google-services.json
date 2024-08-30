@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "937340990491",
+    "project_id": "inventario-29",
+    "storage_bucket": "inventario-29.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:937340990491:android:f8723c7a006e03484134be",
+        "android_client_info": {
+          "package_name": "com.inventarioja.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7skO_m3nrbdVHnKCgvLZYqBzLH85TH14"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

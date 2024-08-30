@@ -1,0 +1,37 @@
+name: inventario
+description: A new Flutter project.
+
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.18.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase dependencies
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.8.1
+
+  # Add other dependencies as required by your project
+  # Example:
+  # cloud_firestore: ^4.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    # Puedes agregar tus carpetas de assets aquí
+    # Ejemplo:
+    # - assets/images/
+    # - assets/icons/
