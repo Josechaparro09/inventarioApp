@@ -1,8 +1,8 @@
 class Producto {
-  String id;
-  String nombre;
-  double precio;
-  int cantidad;
+  final String id;
+  final String nombre;
+  final double precio;
+  final int cantidad;
 
   Producto({
     required this.id,
@@ -11,15 +11,17 @@ class Producto {
     required this.cantidad,
   });
 
-  factory Producto.fromMap(Map<String, dynamic> data) {
+  // Método para convertir un mapa de datos en una instancia de Producto
+  factory Producto.fromMap(Map<String, dynamic> data, String documentId) {
     return Producto(
-      id: data['id'],
-      nombre: data['nombre'],
-      precio: data['precio'],
-      cantidad: data['cantidad'],
+      id: documentId,
+      nombre: data['nombre'] ?? '',
+      precio: data['precio']?.toDouble() ?? 0.0,
+      cantidad: data['cantidad']?.toInt() ?? 0,
     );
   }
 
+  // Método para convertir una instancia de Producto en un mapa
   Map<String, dynamic> toMap() {
     return {
       'id': id,

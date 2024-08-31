@@ -8,23 +8,41 @@ class PantallaAgregarProducto extends StatefulWidget {
 }
 
 class _PantallaAgregarProductoState extends State<PantallaAgregarProducto> {
-  final _formKey = GlobalKey<FormState>();
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _precioController = TextEditingController();
   final TextEditingController _cantidadController = TextEditingController();
 
-  void _agregarProducto() {
-    if (_formKey.currentState!.validate()) {
-      FirebaseFirestore.instance.collection('productos').add({
-        'nombre': _nombreController.text,
-        'precio': double.parse(_precioController.text),
-        'cantidad': int.parse(_cantidadController.text),
-      }).then((value) {
-        Navigator.pop(context);
-      }).catchError((error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al agregar producto: $error')));
+  void _agregarProducto() async {
+    final String nombre = _nombreController.text;
+    final double precio = double.tryParse(_precioController.text) ?? 0.0;
+    final int cantidad = int.tryParse(_cantidadController.text) ?? 0;
+
+    if (nombre.isEmpty || precio <= 0 || cantidad <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Por favor ingrese todos los datos correctamente')),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('productos').add({
+        'nombre': nombre,
+        'precio': precio,
+        'cantidad': cantidad,
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Producto agregado al inventario con éxito')),
+      );
+
+      _nombreController.clear();
+      _precioController.clear();
+      _cantidadController.clear();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al agregar el producto: $e')),
+      );
     }
   }
 
@@ -32,53 +50,32 @@ class _PantallaAgregarProductoState extends State<PantallaAgregarProducto> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Agregar Producto'),
+        title: Text('Agregar Producto al Inventario'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _nombreController,
-                decoration: InputDecoration(labelText: 'Nombre del Producto'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor ingresa el nombre del producto';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _precioController,
-                decoration: InputDecoration(labelText: 'Precio'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor ingresa el precio';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _cantidadController,
-                decoration: InputDecoration(labelText: 'Cantidad'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor ingresa la cantidad';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _agregarProducto,
-                child: Text('Agregar Producto'),
-              ),
-            ],
-          ),
+        child: Column(
+          children: [
+            TextField(
+              controller: _nombreController,
+              decoration: InputDecoration(labelText: 'Nombre del Producto'),
+            ),
+            TextField(
+              controller: _precioController,
+              decoration: InputDecoration(labelText: 'Precio'),
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+            ),
+            TextField(
+              controller: _cantidadController,
+              decoration: InputDecoration(labelText: 'Cantidad'),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _agregarProducto,
+              child: Text('Agregar Producto'),
+            ),
+          ],
         ),
       ),
     );
