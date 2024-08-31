@@ -4,6 +4,8 @@ import 'home_screen.dart'; // Asegúrate de crear esta pantalla
 import 'register_screen.dart'; // Asegúrate de crear esta pantalla
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }

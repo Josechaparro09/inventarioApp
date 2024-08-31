@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -16,6 +17,7 @@ class _PantallaAgregarProductoState extends State<PantallaAgregarProducto> {
     final String nombre = _nombreController.text;
     final double precio = double.tryParse(_precioController.text) ?? 0.0;
     final int cantidad = int.tryParse(_cantidadController.text) ?? 0;
+    final usuario = await FirebaseAuth.instance.currentUser?.getIdToken();
 
     if (nombre.isEmpty || precio <= 0 || cantidad <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -30,7 +32,9 @@ class _PantallaAgregarProductoState extends State<PantallaAgregarProducto> {
         'nombre': nombre,
         'precio': precio,
         'cantidad': cantidad,
+        'usuario': usuario
       });
+      print(usuario);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Producto agregado al inventario con éxito')),

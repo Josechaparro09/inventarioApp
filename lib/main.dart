@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:inventario/pantallas/inventario/pantalla_agregar_producto.dart';
+import 'package:inventario/pantallas/pantalla_principal.dart';
 import 'firebase_options.dart';
 import 'pantallas/autenticacion/pantalla_login.dart';
 

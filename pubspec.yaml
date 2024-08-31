@@ -17,6 +17,7 @@ dependencies:
   firebase_auth: ^4.8.1
   cupertino_icons: ^1.0.8
   cloud_firestore: ^4.0.3
+  go_router: ^14.2.7
 
   # Add other dependencies as required by your project
   # Example:
