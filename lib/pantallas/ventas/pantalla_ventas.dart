@@ -1,7 +1,6 @@
-// ignore_for_file: use_build_context_synchronously, library_private_types_in_public_api
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../modelos/producto.dart';
 
 class PantallaVentas extends StatefulWidget {
@@ -75,6 +74,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
             'cantidadVendida': cantidadVendida,
             'precioFinal': precioFinal,
             'fechaVenta': Timestamp.now(),
+            'usuario': FirebaseAuth.instance.currentUser!.uid,
           },
         );
       }
@@ -104,9 +104,11 @@ class _PantallaVentasState extends State<PantallaVentas> {
 
   @override
   Widget build(BuildContext context) {
+    final usuario = FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ventas'),
+        title: const Text('Ventas'),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -117,6 +119,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
               StreamBuilder(
                 stream: FirebaseFirestore.instance
                     .collection('productos')
+                    .where('usuario', isEqualTo: usuario) // Filtrar por usuario
                     .snapshots(),
                 builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
                   if (snapshot.hasError) {
@@ -126,18 +129,18 @@ class _PantallaVentasState extends State<PantallaVentas> {
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(
+                    return const Center(
                         child: Text(
                             'No hay productos disponibles en el inventario.'));
                   }
 
                   final productos = snapshot.data!.docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    return Producto.fromMap(data);
+                    return Producto.fromMap(data, doc.id);
                   }).toList();
 
                   return Column(
@@ -153,30 +156,31 @@ class _PantallaVentasState extends State<PantallaVentas> {
                           contentPadding: const EdgeInsets.all(16.0),
                           title: Text(
                             producto.nombre,
-                            style: TextStyle(
+                            style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                               'Precio: \$${producto.precio.toStringAsFixed(2)}'),
                           trailing: productosSeleccionados.containsKey(producto)
                               ? IconButton(
-                                  icon: Icon(Icons.remove_circle,
+                                  icon: const Icon(Icons.remove_circle,
                                       color: Colors.red),
                                   onPressed: () =>
                                       _eliminarProductoSeleccionado(producto),
                                 )
                               : IconButton(
-                                  icon: Icon(Icons.add_circle,
+                                  icon: const Icon(Icons.add_circle,
                                       color: Colors.teal),
                                   onPressed: () {
                                     showDialog(
                                       context: context,
                                       builder: (context) {
                                         return AlertDialog(
-                                          title: Text('Cantidad a vender'),
+                                          title:
+                                              const Text('Cantidad a vender'),
                                           content: TextField(
                                             controller: _cantidadController,
-                                            decoration: InputDecoration(
+                                            decoration: const InputDecoration(
                                               labelText: 'Cantidad',
                                               border: OutlineInputBorder(),
                                             ),
@@ -196,14 +200,14 @@ class _PantallaVentasState extends State<PantallaVentas> {
                                                   Navigator.of(context).pop();
                                                 }
                                               },
-                                              child: Text('Agregar'),
+                                              child: const Text('Agregar'),
                                             ),
                                             TextButton(
                                               onPressed: () {
                                                 _cantidadController.clear();
                                                 Navigator.of(context).pop();
                                               },
-                                              child: Text('Cancelar'),
+                                              child: const Text('Cancelar'),
                                             ),
                                           ],
                                         );
@@ -217,28 +221,28 @@ class _PantallaVentasState extends State<PantallaVentas> {
                   );
                 },
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               if (productosSeleccionados.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Productos seleccionados:',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     ...productosSeleccionados.entries.map((entry) {
                       return ListTile(
-                        title: Text('${entry.key.nombre}'),
+                        title: Text(entry.key.nombre),
                         subtitle: Text('Cantidad: ${entry.value}'),
                         trailing: Text(
                           'Total: \$${(entry.key.precio * entry.value).toStringAsFixed(2)}',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       );
                     }).toList(),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     Center(
                       child: ElevatedButton(
                         onPressed: _realizarVenta,
@@ -249,7 +253,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10.0)),
                         ),
-                        child: Text(
+                        child: const Text(
                           'Realizar Venta',
                           style: TextStyle(fontSize: 18),
                         ),

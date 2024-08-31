@@ -20,7 +20,7 @@ class ServicioInventario {
   Stream<List<Producto>> obtenerProductos() {
     return _productosCollection.snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
-        return Producto.fromMap(doc.data() as Map<String, dynamic>);
+        return Producto.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
     });
   }

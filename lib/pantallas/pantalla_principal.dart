@@ -26,17 +26,6 @@ class PantallaPrincipal extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: Icon(Icons.add),
-            title: Text('Agregar Producto'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => PantallaAgregarProducto()),
-              );
-            },
-          ),
-          ListTile(
             leading: Icon(Icons.shopping_cart),
             title: Text('Realizar Venta'),
             onTap: () {

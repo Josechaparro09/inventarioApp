@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../modelos/producto.dart'; // Importa la clase Producto
@@ -8,6 +9,8 @@ class PantallaInventario extends StatefulWidget {
 }
 
 class _PantallaInventarioState extends State<PantallaInventario> {
+  final String usuario = FirebaseAuth.instance.currentUser?.uid ?? '';
+
   void _eliminarProducto(String idProducto) async {
     try {
       await FirebaseFirestore.instance
@@ -93,7 +96,7 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     );
   }
 
-  void _mostrarDialogoAgregarProducto() {
+  Future<void> _mostrarDialogoAgregarProducto() async {
     TextEditingController _nombreController = TextEditingController();
     TextEditingController _precioController = TextEditingController();
     TextEditingController _cantidadController = TextEditingController();
@@ -130,6 +133,7 @@ class _PantallaInventarioState extends State<PantallaInventario> {
                     'nombre': _nombreController.text,
                     'precio': double.parse(_precioController.text),
                     'cantidad': int.parse(_cantidadController.text),
+                    'usuario': usuario, // Asociar el producto al usuario actual
                   });
 
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +167,11 @@ class _PantallaInventarioState extends State<PantallaInventario> {
         title: Text('Inventario'),
       ),
       body: StreamBuilder(
-        stream: FirebaseFirestore.instance.collection('productos').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('productos')
+            .where('usuario',
+                isEqualTo: usuario) // Filtrar productos por usuario
+            .snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
           if (snapshot.hasError) {
             return Center(
@@ -195,8 +203,8 @@ class _PantallaInventarioState extends State<PantallaInventario> {
                 Future.delayed(Duration.zero, () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                        content: Text(
-                            '¡Alerta! Stock bajo para ${producto.nombre}')),
+                        content:
+                            Text('¡Alerta! Stock bajo  ${producto.nombre}')),
                   );
                 });
               }
@@ -232,7 +240,8 @@ class _PantallaInventarioState extends State<PantallaInventario> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.edit, color: Colors.blueAccent),
+                        icon: Icon(Icons.edit,
+                            color: const Color.fromARGB(255, 12, 87, 219)),
                         onPressed: () => _editarProducto(producto),
                       ),
                       IconButton(
