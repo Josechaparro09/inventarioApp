@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:inventario/pantallas/ventas/pantalla_agregar_venta.dart';
+import 'package:inventario/pantallas/ventas/pantalla_ventas.dart';
 import 'firebase_options.dart';
 import 'pantallas/autenticacion/pantalla_login.dart';
 
@@ -19,7 +21,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: PantallaLogin(),
+      home: PantallaVentas(),
       debugShowCheckedModeBanner: false,
     );
   }

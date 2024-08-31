@@ -23,7 +23,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
     });
   }
 
-  void _realizarVenta() async {
+  Future<void> _realizarVenta() async {
     if (productosSeleccionados.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Por favor selecciona al menos un producto')),
@@ -31,65 +31,69 @@ class _PantallaVentasState extends State<PantallaVentas> {
       return;
     }
 
-    try {
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        for (var entry in productosSeleccionados.entries) {
-          final producto = entry.key;
-          final cantidadVendida = entry.value;
+    for (var entry in productosSeleccionados.entries) {
+      final producto = entry.key;
+      final cantidadVendida = entry.value;
 
-          DocumentReference productoRef = FirebaseFirestore.instance
-              .collection('productos')
-              .doc(producto.id);
+      try {
+        DocumentReference productoRef =
+            FirebaseFirestore.instance.collection('productos').doc(producto.id);
 
-          DocumentSnapshot productoSnapshot =
-              await transaction.get(productoRef);
+        DocumentSnapshot productoSnapshot = await productoRef.get();
 
-          if (!productoSnapshot.exists) {
-            throw Exception("El producto no existe");
-          }
-
-          int cantidadActual = productoSnapshot['cantidad'];
-
-          if (cantidadActual < cantidadVendida) {
-            throw Exception(
-                "Cantidad insuficiente en inventario para ${producto.nombre}");
-          }
-
-          // Actualizar la cantidad en inventario
-          transaction.update(productoRef, {
-            'cantidad': cantidadActual - cantidadVendida,
-          });
-
-          double precioFinal = producto.precio * cantidadVendida;
-
-          // Registrar la venta en Firestore
-          await transaction.set(
-            FirebaseFirestore.instance.collection('ventas').doc(),
-            {
-              'idProducto': producto.id,
-              'nombreProducto': producto.nombre,
-              'cantidadVendida': cantidadVendida,
-              'precioFinal': precioFinal,
-              'fechaVenta': Timestamp.now(),
-            },
-          );
+        if (!productoSnapshot.exists) {
+          throw Exception("El producto no existe: ${producto.nombre}");
         }
-      });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Venta realizada con éxito')),
-      );
+        int cantidadActual = productoSnapshot['cantidad'];
 
-      // Limpiar la selección después de la venta
-      setState(() {
-        productosSeleccionados.clear();
-        _cantidadController.clear();
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al realizar la venta: $e')),
-      );
+        if (cantidadActual < cantidadVendida) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Cantidad insuficiente en inventario para ${producto.nombre}')),
+          );
+          return; // Detenemos el proceso si la cantidad es insuficiente
+        }
+
+        // Actualiza la cantidad de producto en el inventario
+        await productoRef.update({
+          'cantidad': cantidadActual - cantidadVendida,
+        });
+
+        double precioFinal = producto.precio * cantidadVendida;
+
+        // Registra la venta en la colección "ventas"
+        await FirebaseFirestore.instance.collection('ventas').add({
+          'idProducto': producto.id,
+          'nombreProducto': producto.nombre,
+          'cantidadVendida': cantidadVendida,
+          'precioFinal': precioFinal,
+          'fechaVenta': Timestamp.now(),
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Venta realizada con éxito para ${producto.nombre}')),
+        );
+      } catch (e, stacktrace) {
+        print("Error al realizar la venta para ${producto.nombre}: $e");
+        print("Stacktrace: $stacktrace");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Error al realizar la venta para ${producto.nombre}: $e\nDetalles: $stacktrace')),
+        );
+        break; // Detenemos el loop si hay un error
+      }
     }
+
+    // Limpiamos los productos seleccionados después de realizar las ventas
+    setState(() {
+      productosSeleccionados.clear();
+      _cantidadController.clear();
+    });
   }
 
   @override
