@@ -12,9 +12,9 @@ class Producto {
   });
 
   // Método para convertir un mapa de datos en una instancia de Producto
-  factory Producto.fromMap(Map<String, dynamic> data, String documentId) {
+  factory Producto.fromMap(Map<String, dynamic> data) {
     return Producto(
-      id: documentId,
+      id: data['id'] ?? '',
       nombre: data['nombre'] ?? '',
       precio: data['precio']?.toDouble() ?? 0.0,
       cantidad: data['cantidad']?.toInt() ?? 0,

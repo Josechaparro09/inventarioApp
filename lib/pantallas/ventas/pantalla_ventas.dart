@@ -1,8 +1,12 @@
+// ignore_for_file: use_build_context_synchronously, library_private_types_in_public_api
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../modelos/producto.dart';
 
 class PantallaVentas extends StatefulWidget {
+  const PantallaVentas({super.key});
+
   @override
   _PantallaVentasState createState() => _PantallaVentasState();
 }
@@ -26,16 +30,19 @@ class _PantallaVentasState extends State<PantallaVentas> {
   Future<void> _realizarVenta() async {
     if (productosSeleccionados.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Por favor selecciona al menos un producto')),
+        const SnackBar(
+            content: Text('Por favor selecciona al menos un producto')),
       );
       return;
     }
 
-    for (var entry in productosSeleccionados.entries) {
-      final producto = entry.key;
-      final cantidadVendida = entry.value;
+    try {
+      WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      try {
+      for (var entry in productosSeleccionados.entries) {
+        final producto = entry.key;
+        final cantidadVendida = entry.value;
+
         DocumentReference productoRef =
             FirebaseFirestore.instance.collection('productos').doc(producto.id);
 
@@ -48,52 +55,51 @@ class _PantallaVentasState extends State<PantallaVentas> {
         int cantidadActual = productoSnapshot['cantidad'];
 
         if (cantidadActual < cantidadVendida) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(
-                    'Cantidad insuficiente en inventario para ${producto.nombre}')),
-          );
-          return; // Detenemos el proceso si la cantidad es insuficiente
+          throw Exception(
+              "Cantidad insuficiente en inventario para ${producto.nombre}");
         }
 
         // Actualiza la cantidad de producto en el inventario
-        await productoRef.update({
+        batch.update(productoRef, {
           'cantidad': cantidadActual - cantidadVendida,
         });
 
         double precioFinal = producto.precio * cantidadVendida;
 
         // Registra la venta en la colección "ventas"
-        await FirebaseFirestore.instance.collection('ventas').add({
-          'idProducto': producto.id,
-          'nombreProducto': producto.nombre,
-          'cantidadVendida': cantidadVendida,
-          'precioFinal': precioFinal,
-          'fechaVenta': Timestamp.now(),
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('Venta realizada con éxito para ${producto.nombre}')),
+        batch.set(
+          FirebaseFirestore.instance.collection('ventas').doc(),
+          {
+            'idProducto': producto.id,
+            'nombreProducto': producto.nombre,
+            'cantidadVendida': cantidadVendida,
+            'precioFinal': precioFinal,
+            'fechaVenta': Timestamp.now(),
+          },
         );
-      } catch (e, stacktrace) {
-        print("Error al realizar la venta para ${producto.nombre}: $e");
-        print("Stacktrace: $stacktrace");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Error al realizar la venta para ${producto.nombre}: $e\nDetalles: $stacktrace')),
-        );
-        break; // Detenemos el loop si hay un error
       }
-    }
 
-    // Limpiamos los productos seleccionados después de realizar las ventas
-    setState(() {
-      productosSeleccionados.clear();
-      _cantidadController.clear();
-    });
+      // Commit the batch
+      await batch.commit();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Venta realizada con éxito')),
+      );
+
+      setState(() {
+        productosSeleccionados.clear();
+        _cantidadController.clear();
+      });
+    } catch (e, stacktrace) {
+      print("Error al realizar la venta: $e");
+      print("Stacktrace: $stacktrace");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text('Error al realizar la venta: $e\nDetalles: $stacktrace')),
+      );
+    }
   }
 
   @override
@@ -131,7 +137,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
 
                   final productos = snapshot.data!.docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    return Producto.fromMap(data, doc.id);
+                    return Producto.fromMap(data);
                   }).toList();
 
                   return Column(
