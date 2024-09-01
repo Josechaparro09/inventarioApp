@@ -15,6 +15,11 @@ class _PantallaVentasState extends State<PantallaVentas> {
   final TextEditingController _cantidadController = TextEditingController();
 
   void _agregarProductoSeleccionado(Producto producto, int cantidad) {
+    if (producto.id == null || producto.id.isEmpty) {
+      print('Error: Producto ID está vacío');
+      return; // O lanza una excepción dependiendo de cómo quieres manejar esto
+    }
+
     setState(() {
       productosSeleccionados[producto] = cantidad;
     });
@@ -42,6 +47,10 @@ class _PantallaVentasState extends State<PantallaVentas> {
         final producto = entry.key;
         final cantidadVendida = entry.value;
 
+        if (producto.id.isEmpty) {
+          throw Exception('El ID del producto no puede estar vacío');
+        }
+
         DocumentReference productoRef =
             FirebaseFirestore.instance.collection('productos').doc(producto.id);
 
@@ -58,32 +67,30 @@ class _PantallaVentasState extends State<PantallaVentas> {
               "Cantidad insuficiente en inventario para ${producto.nombre}");
         }
 
-        // Actualiza la cantidad de producto en el inventario
-        batch.update(productoRef, {
-          'cantidad': cantidadActual - cantidadVendida,
-        });
-
-        double precioFinal = producto.precio * cantidadVendida;
-
-        // Registra la venta en la colección "ventas"
-        batch.set(
-          FirebaseFirestore.instance.collection('ventas').doc(),
-          {
-            'idProducto': producto.id,
-            'nombreProducto': producto.nombre,
-            'cantidadVendida': cantidadVendida,
-            'precioFinal': precioFinal,
-            'fechaVenta': Timestamp.now(),
-            'usuario': FirebaseAuth.instance.currentUser!.uid,
-          },
-        );
+        _actualizarInventario(
+            batch, productoRef, cantidadActual - cantidadVendida);
+        _registrarVenta(batch, producto, cantidadVendida);
       }
 
-      // Commit the batch
       await batch.commit();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Venta realizada con éxito')),
+      // Mostrar ventana emergente de éxito
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Venta realizada'),
+            content: const Text('La venta se realizó con éxito.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Aceptar'),
+              ),
+            ],
+          );
+        },
       );
 
       setState(() {
@@ -102,13 +109,39 @@ class _PantallaVentasState extends State<PantallaVentas> {
     }
   }
 
+  void _actualizarInventario(
+      WriteBatch batch, DocumentReference productoRef, int nuevaCantidad) {
+    batch.update(productoRef, {
+      'cantidad': nuevaCantidad,
+    });
+  }
+
+  void _registrarVenta(
+      WriteBatch batch, Producto producto, int cantidadVendida) {
+    double precioFinal = producto.precio * cantidadVendida;
+
+    batch.set(
+      FirebaseFirestore.instance.collection('ventas').doc(),
+      {
+        'idProducto': producto.id,
+        'nombreProducto': producto.nombre,
+        'cantidadVendida': cantidadVendida,
+        'precioFinal': precioFinal,
+        'fechaVenta': Timestamp.now(),
+        'usuario': FirebaseAuth.instance.currentUser!.uid,
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFFFF8E1), // Fondo en color crema
       appBar: AppBar(
         title: const Text('Ventas'),
+        backgroundColor: const Color(0xFFFFA726), // Color de la AppBar
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -119,7 +152,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
               StreamBuilder(
                 stream: FirebaseFirestore.instance
                     .collection('productos')
-                    .where('usuario', isEqualTo: usuario) // Filtrar por usuario
+                    .where('usuario', isEqualTo: usuario)
                     .snapshots(),
                 builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
                   if (snapshot.hasError) {
@@ -140,7 +173,8 @@ class _PantallaVentasState extends State<PantallaVentas> {
 
                   final productos = snapshot.data!.docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    return Producto.fromMap(data, doc.id);
+                    return Producto.fromMap(
+                        data, doc.id); // Pasando el ID correctamente
                   }).toList();
 
                   return Column(
@@ -148,19 +182,34 @@ class _PantallaVentasState extends State<PantallaVentas> {
                       return Card(
                         margin: const EdgeInsets.symmetric(
                             vertical: 8.0, horizontal: 12.0),
-                        elevation: 4,
+                        elevation: 8,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: ListTile(
                           contentPadding: const EdgeInsets.all(16.0),
                           title: Text(
-                            producto.nombre,
+                            producto.nombre ?? 'Producto sin nombre',
                             style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF212121)),
                           ),
-                          subtitle: Text(
-                              'Precio: \$${producto.precio.toStringAsFixed(2)}'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Precio: \$${producto.precio.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    color: Color(0xFF757575), fontSize: 16),
+                              ),
+                              Text(
+                                'Cantidad disponible: ${producto.cantidad}',
+                                style: const TextStyle(
+                                    color: Color(0xFF757575), fontSize: 16),
+                              ),
+                            ],
+                          ),
                           trailing: productosSeleccionados.containsKey(producto)
                               ? IconButton(
                                   icon: const Icon(Icons.remove_circle,
@@ -170,7 +219,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
                                 )
                               : IconButton(
                                   icon: const Icon(Icons.add_circle,
-                                      color: Colors.teal),
+                                      color: Color.fromRGBO(255, 167, 38, 1)),
                                   onPressed: () {
                                     showDialog(
                                       context: context,
@@ -233,14 +282,21 @@ class _PantallaVentasState extends State<PantallaVentas> {
                     ),
                     const SizedBox(height: 10),
                     ...productosSeleccionados.entries.map((entry) {
-                      return ListTile(
-                        title: Text(entry.key.nombre),
-                        subtitle: Text('Cantidad: ${entry.value}'),
-                        trailing: Text(
-                          'Total: \$${(entry.key.precio * entry.value).toStringAsFixed(2)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      );
+                      final producto = entry.key;
+                      final cantidad = entry.value;
+
+                      if (producto != null && cantidad != null) {
+                        return ListTile(
+                          title: Text(producto.nombre ?? 'Producto sin nombre'),
+                          subtitle: Text('Cantidad: $cantidad'),
+                          trailing: Text(
+                            'Total: \$${(producto.precio * cantidad).toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      } else {
+                        return const SizedBox.shrink();
+                      }
                     }).toList(),
                     const SizedBox(height: 20),
                     Center(
@@ -249,7 +305,8 @@ class _PantallaVentasState extends State<PantallaVentas> {
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 30.0, vertical: 15.0),
-                          backgroundColor: Colors.teal,
+                          backgroundColor:
+                              const Color.fromRGBO(255, 167, 38, 1),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10.0)),
                         ),

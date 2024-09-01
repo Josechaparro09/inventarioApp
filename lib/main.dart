@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:inventario/pantallas/inventario/pantalla_inventario.dart';
 import 'firebase_options.dart';
 import 'pantallas/autenticacion/pantalla_login.dart';
+import 'pantallas/pantalla_principal.dart';
+import 'pantallas/autenticacion/pantalla_registro.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,8 +22,14 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: PantallaLogin(),
       debugShowCheckedModeBanner: false,
+      initialRoute: '/',
+      routes: {
+        '/': (context) => PantallaLogin(),
+        '/principal': (context) => PantallaPrincipal(),
+        '/registro': (context) => PantallaRegistro(),
+        '/pantalla ': (context) => PantallaInventario(),
+      },
     );
   }
 }

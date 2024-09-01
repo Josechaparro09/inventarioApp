@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../modelos/producto.dart'; // Importa la clase Producto
+import '../../modelos/producto.dart';
 
 class PantallaInventario extends StatefulWidget {
   @override
@@ -10,6 +10,128 @@ class PantallaInventario extends StatefulWidget {
 
 class _PantallaInventarioState extends State<PantallaInventario> {
   final String usuario = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: _construirAppBar(),
+      body: _construirCuerpo(),
+      floatingActionButton: _construirBotonAgregarProducto(),
+      backgroundColor: Color(0xFFFFF8E1),
+    );
+  }
+
+  AppBar _construirAppBar() {
+    return AppBar(
+      title: Text('Inventario'),
+      backgroundColor: Color(0xFFFFA726),
+    );
+  }
+
+  Widget _construirCuerpo() {
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('productos')
+          .where('usuario', isEqualTo: usuario)
+          .snapshots(),
+      builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+              child: Text('Error al cargar el inventario: ${snapshot.error}'));
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(child: Text('No hay productos en el inventario.'));
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(8.0),
+          children: snapshot.data!.docs.map((doc) {
+            return _construirProductoCard(doc);
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Card _construirProductoCard(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final producto = Producto(
+      id: doc.id,
+      nombre: data['nombre'],
+      precio: data['precio'].toDouble(),
+      cantidad: data['cantidad'],
+    );
+
+    // Verificar si la cantidad es baja y mostrar una alerta
+    if (producto.cantidad <= 5) {
+      Future.delayed(Duration.zero, () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('¡Alerta! Stock bajo para ${producto.nombre}')),
+        );
+      });
+    }
+
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16.0),
+        leading: Icon(Icons.inventory, color: Color(0xFFFFA726), size: 40),
+        title: Text(
+          producto.nombre,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: Color(0xFF212121),
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 8.0),
+            Text('Precio: \$${producto.precio.toStringAsFixed(2)}',
+                style: TextStyle(color: Color(0xFF757575))),
+            SizedBox(height: 4.0),
+            Text('Cantidad: ${producto.cantidad}',
+                style: TextStyle(color: Color(0xFF757575))),
+          ],
+        ),
+        trailing: _construirBotonesAccion(producto),
+      ),
+    );
+  }
+
+  Row _construirBotonesAccion(Producto producto) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: Icon(Icons.edit, color: Color(0xFF42A5F5)),
+          onPressed: () => _editarProducto(producto),
+        ),
+        IconButton(
+          icon: Icon(Icons.delete, color: Colors.redAccent),
+          onPressed: () => _eliminarProducto(producto.id),
+        ),
+      ],
+    );
+  }
+
+  FloatingActionButton _construirBotonAgregarProducto() {
+    return FloatingActionButton(
+      onPressed: _mostrarDialogoAgregarProducto,
+      child: Icon(Icons.add),
+      backgroundColor: Color(0xFFFFA726),
+    );
+  }
 
   void _eliminarProducto(String idProducto) async {
     try {
@@ -43,20 +165,11 @@ class _PantallaInventarioState extends State<PantallaInventario> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: _nombreController,
-                decoration: InputDecoration(labelText: 'Nombre'),
-              ),
-              TextField(
-                controller: _precioController,
-                decoration: InputDecoration(labelText: 'Precio'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: _cantidadController,
-                decoration: InputDecoration(labelText: 'Cantidad'),
-                keyboardType: TextInputType.number,
-              ),
+              _construirTextField(_nombreController, 'Nombre'),
+              _construirTextField(_precioController, 'Precio',
+                  keyboardType: TextInputType.number),
+              _construirTextField(_cantidadController, 'Cantidad',
+                  keyboardType: TextInputType.number),
             ],
           ),
           actions: [
@@ -109,20 +222,11 @@ class _PantallaInventarioState extends State<PantallaInventario> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: _nombreController,
-                decoration: InputDecoration(labelText: 'Nombre'),
-              ),
-              TextField(
-                controller: _precioController,
-                decoration: InputDecoration(labelText: 'Precio'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: _cantidadController,
-                decoration: InputDecoration(labelText: 'Cantidad'),
-                keyboardType: TextInputType.number,
-              ),
+              _construirTextField(_nombreController, 'Nombre'),
+              _construirTextField(_precioController, 'Precio',
+                  keyboardType: TextInputType.number),
+              _construirTextField(_cantidadController, 'Cantidad',
+                  keyboardType: TextInputType.number),
             ],
           ),
           actions: [
@@ -160,107 +264,12 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Inventario'),
-      ),
-      body: StreamBuilder(
-        stream: FirebaseFirestore.instance
-            .collection('productos')
-            .where('usuario',
-                isEqualTo: usuario) // Filtrar productos por usuario
-            .snapshots(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-                child:
-                    Text('Error al cargar el inventario: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No hay productos en el inventario.'));
-          }
-
-          return ListView(
-            padding: const EdgeInsets.all(8.0),
-            children: snapshot.data!.docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final producto = Producto(
-                id: doc.id,
-                nombre: data['nombre'],
-                precio: data['precio'].toDouble(),
-                cantidad: data['cantidad'],
-              );
-
-              // Verificar si la cantidad es baja y mostrar una alerta
-              if (producto.cantidad <= 5) {
-                Future.delayed(Duration.zero, () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content:
-                            Text('¡Alerta! Stock bajo  ${producto.nombre}')),
-                  );
-                });
-              }
-
-              return Card(
-                margin:
-                    const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-                elevation: 6,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15.0),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16.0),
-                  title: Text(
-                    producto.nombre,
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.teal),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 8.0),
-                      Text('Precio: \$${producto.precio.toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.black54)),
-                      SizedBox(height: 4.0),
-                      Text('Cantidad: ${producto.cantidad}',
-                          style: TextStyle(color: Colors.black54)),
-                    ],
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit,
-                            color: const Color.fromARGB(255, 12, 87, 219)),
-                        onPressed: () => _editarProducto(producto),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.delete, color: Colors.redAccent),
-                        onPressed: () => _eliminarProducto(producto.id),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _mostrarDialogoAgregarProducto,
-        child: Icon(Icons.add),
-        backgroundColor: Colors.teal,
-      ),
+  TextField _construirTextField(TextEditingController controller, String label,
+      {TextInputType? keyboardType}) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(labelText: label),
+      keyboardType: keyboardType,
     );
   }
 }

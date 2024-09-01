@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../pantalla_principal.dart';
-import 'pantalla_registro.dart';
 
 class PantallaLogin extends StatefulWidget {
   @override
@@ -13,6 +11,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscureText = true;
 
   Future<void> _login() async {
     setState(() {
@@ -23,10 +22,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => PantallaPrincipal()),
-      );
+      Navigator.pushReplacementNamed(context, '/principal');
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -77,12 +73,23 @@ class _PantallaLoginState extends State<PantallaLogin> {
                     filled: true,
                     fillColor: Colors.white,
                     prefixIcon: Icon(Icons.lock, color: Color(0xFFFFA726)),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureText ? Icons.visibility : Icons.visibility_off,
+                        color: Color(0xFFFFA726),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                      },
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  obscureText: true,
+                  obscureText: _obscureText,
                 ),
                 SizedBox(height: 30),
                 // Botón de inicio de sesión
@@ -111,11 +118,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
                 // Botón de registro
                 TextButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => PantallaRegistro()),
-                    );
+                    Navigator.pushNamed(context, '/registro');
                   },
                   child: Text(
                     '¿No tienes una cuenta? Regístrate',
