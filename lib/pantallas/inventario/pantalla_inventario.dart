@@ -14,67 +14,71 @@ class _PantallaInventarioState extends State<PantallaInventario> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _construirAppBar(),
-      body: _construirCuerpo(),
-      floatingActionButton: _construirBotonAgregarProducto(),
+      appBar: _buildAppBar(),
+      body: _buildBody(),
+      floatingActionButton: _buildAddProductButton(),
       backgroundColor: Color(0xFFFFF8E1),
     );
   }
 
-  AppBar _construirAppBar() {
+  AppBar _buildAppBar() {
     return AppBar(
       title: Text('Inventario'),
       backgroundColor: Color(0xFFFFA726),
     );
   }
 
-  Widget _construirCuerpo() {
+  Widget _buildBody() {
     return StreamBuilder(
-      stream: FirebaseFirestore.instance
-          .collection('productos')
-          .where('usuario', isEqualTo: usuario)
-          .snapshots(),
+      stream: _getProductStream(),
       builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
         if (snapshot.hasError) {
-          return Center(
-              child: Text('Error al cargar el inventario: ${snapshot.error}'));
+          return _buildErrorMessage(snapshot.error);
         }
-
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return _buildLoadingIndicator();
         }
-
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text('No hay productos en el inventario.'));
+          return _buildEmptyInventoryMessage();
         }
-
-        return ListView(
-          padding: const EdgeInsets.all(8.0),
-          children: snapshot.data!.docs.map((doc) {
-            return _construirProductoCard(doc);
-          }).toList(),
-        );
+        return _buildProductList(snapshot.data!.docs);
       },
     );
   }
 
-  Card _construirProductoCard(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final producto = Producto(
-      id: doc.id,
-      nombre: data['nombre'],
-      precio: data['precio'].toDouble(),
-      cantidad: data['cantidad'],
-    );
+  Stream<QuerySnapshot> _getProductStream() {
+    return FirebaseFirestore.instance
+        .collection('productos')
+        .where('usuario', isEqualTo: usuario)
+        .snapshots();
+  }
 
-    // Verificar si la cantidad es baja y mostrar una alerta
+  Widget _buildErrorMessage(Object? error) {
+    return Center(
+      child: Text('Error al cargar el inventario: $error'),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Center(child: CircularProgressIndicator());
+  }
+
+  Widget _buildEmptyInventoryMessage() {
+    return Center(child: Text('No hay productos en el inventario.'));
+  }
+
+  Widget _buildProductList(List<DocumentSnapshot> documents) {
+    return ListView(
+      padding: const EdgeInsets.all(8.0),
+      children: documents.map((doc) => _buildProductCard(doc)).toList(),
+    );
+  }
+
+  Card _buildProductCard(DocumentSnapshot doc) {
+    final producto = _convertToProducto(doc);
+
     if (producto.cantidad <= 5) {
-      Future.delayed(Duration.zero, () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('¡Alerta! Stock bajo para ${producto.nombre}')),
-        );
-      });
+      _showLowStockAlert(producto.nombre);
     }
 
     return Card(
@@ -93,183 +97,196 @@ class _PantallaInventarioState extends State<PantallaInventario> {
             color: Color(0xFF212121),
           ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 8.0),
-            Text('Precio: \$${producto.precio.toStringAsFixed(2)}',
-                style: TextStyle(color: Color(0xFF757575))),
-            SizedBox(height: 4.0),
-            Text('Cantidad: ${producto.cantidad}',
-                style: TextStyle(color: Color(0xFF757575))),
-          ],
-        ),
-        trailing: _construirBotonesAccion(producto),
+        subtitle: _buildProductDetails(producto),
+        trailing: _buildActionButtons(producto),
       ),
     );
   }
 
-  Row _construirBotonesAccion(Producto producto) {
+  Producto _convertToProducto(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Producto(
+      id: doc.id,
+      nombre: data['nombre'],
+      precio: data['precio'].toDouble(),
+      cantidad: data['cantidad'],
+    );
+  }
+
+  void _showLowStockAlert(String productName) {
+    Future.delayed(Duration.zero, () {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('¡Alerta! Stock bajo para $productName')),
+      );
+    });
+  }
+
+  Column _buildProductDetails(Producto producto) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 8.0),
+        Text('Precio: \$${producto.precio.toStringAsFixed(2)}',
+            style: TextStyle(color: Color(0xFF757575))),
+        SizedBox(height: 4.0),
+        Text('Cantidad: ${producto.cantidad}',
+            style: TextStyle(color: Color(0xFF757575))),
+      ],
+    );
+  }
+
+  Row _buildActionButtons(Producto producto) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           icon: Icon(Icons.edit, color: Color(0xFF42A5F5)),
-          onPressed: () => _editarProducto(producto),
+          onPressed: () => _editProduct(producto),
         ),
         IconButton(
           icon: Icon(Icons.delete, color: Colors.redAccent),
-          onPressed: () => _eliminarProducto(producto.id),
+          onPressed: () => _deleteProduct(producto.id),
         ),
       ],
     );
   }
 
-  FloatingActionButton _construirBotonAgregarProducto() {
+  FloatingActionButton _buildAddProductButton() {
     return FloatingActionButton(
-      onPressed: _mostrarDialogoAgregarProducto,
+      onPressed: _showAddProductDialog,
       child: Icon(Icons.add),
       backgroundColor: Color(0xFFFFA726),
     );
   }
 
-  void _eliminarProducto(String idProducto) async {
+  Future<void> _deleteProduct(String productId) async {
     try {
       await FirebaseFirestore.instance
           .collection('productos')
-          .doc(idProducto)
+          .doc(productId)
           .delete();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Producto eliminado con éxito')),
-      );
+      _showSnackbar('Producto eliminado con éxito');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al eliminar producto: $e')),
-      );
+      _showSnackbar('Error al eliminar producto: $e');
     }
   }
 
-  void _editarProducto(Producto producto) {
-    TextEditingController _nombreController =
-        TextEditingController(text: producto.nombre);
-    TextEditingController _precioController =
+  void _editProduct(Producto producto) {
+    final _nombreController = TextEditingController(text: producto.nombre);
+    final _precioController =
         TextEditingController(text: producto.precio.toString());
-    TextEditingController _cantidadController =
+    final _cantidadController =
         TextEditingController(text: producto.cantidad.toString());
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Editar Producto'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _construirTextField(_nombreController, 'Nombre'),
-              _construirTextField(_precioController, 'Precio',
-                  keyboardType: TextInputType.number),
-              _construirTextField(_cantidadController, 'Cantidad',
-                  keyboardType: TextInputType.number),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('productos')
-                      .doc(producto.id)
-                      .update({
-                    'nombre': _nombreController.text,
-                    'precio': double.parse(_precioController.text),
-                    'cantidad': int.parse(_cantidadController.text),
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Producto actualizado con éxito')),
-                  );
-                  Navigator.of(context).pop(); // Cerrar el diálogo
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error al actualizar producto: $e')),
-                  );
-                }
-              },
-              child: Text('Guardar'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancelar'),
-            ),
-          ],
+        return _buildProductDialog(
+          title: 'Editar Producto',
+          nombreController: _nombreController,
+          precioController: _precioController,
+          cantidadController: _cantidadController,
+          onSave: () => _updateProduct(producto.id, _nombreController.text,
+              _precioController.text, _cantidadController.text),
         );
       },
     );
   }
 
-  Future<void> _mostrarDialogoAgregarProducto() async {
-    TextEditingController _nombreController = TextEditingController();
-    TextEditingController _precioController = TextEditingController();
-    TextEditingController _cantidadController = TextEditingController();
+  Future<void> _updateProduct(
+      String productId, String nombre, String precio, String cantidad) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('productos')
+          .doc(productId)
+          .update({
+        'nombre': nombre,
+        'precio': double.parse(precio),
+        'cantidad': int.parse(cantidad),
+      });
+      _showSnackbar('Producto actualizado con éxito');
+      Navigator.of(context).pop(); // Cerrar el diálogo
+    } catch (e) {
+      _showSnackbar('Error al actualizar producto: $e');
+    }
+  }
+
+  Future<void> _showAddProductDialog() async {
+    final _nombreController = TextEditingController();
+    final _precioController = TextEditingController();
+    final _cantidadController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Agregar Producto'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _construirTextField(_nombreController, 'Nombre'),
-              _construirTextField(_precioController, 'Precio',
-                  keyboardType: TextInputType.number),
-              _construirTextField(_cantidadController, 'Cantidad',
-                  keyboardType: TextInputType.number),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await FirebaseFirestore.instance.collection('productos').add({
-                    'nombre': _nombreController.text,
-                    'precio': double.parse(_precioController.text),
-                    'cantidad': int.parse(_cantidadController.text),
-                    'usuario': usuario, // Asociar el producto al usuario actual
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Producto agregado con éxito')),
-                  );
-                  Navigator.of(context).pop(); // Cerrar el diálogo
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error al agregar producto: $e')),
-                  );
-                }
-              },
-              child: Text('Agregar'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancelar'),
-            ),
-          ],
+        return _buildProductDialog(
+          title: 'Agregar Producto',
+          nombreController: _nombreController,
+          precioController: _precioController,
+          cantidadController: _cantidadController,
+          onSave: () => _addProduct(_nombreController.text,
+              _precioController.text, _cantidadController.text),
         );
       },
     );
   }
 
-  TextField _construirTextField(TextEditingController controller, String label,
+  Future<void> _addProduct(
+      String nombre, String precio, String cantidad) async {
+    try {
+      await FirebaseFirestore.instance.collection('productos').add({
+        'nombre': nombre,
+        'precio': double.parse(precio),
+        'cantidad': int.parse(cantidad),
+        'usuario': usuario, // Asociar el producto al usuario actual
+      });
+      _showSnackbar('Producto agregado con éxito');
+      Navigator.of(context).pop(); // Cerrar el diálogo
+    } catch (e) {
+      _showSnackbar('Error al agregar producto: $e');
+    }
+  }
+
+  AlertDialog _buildProductDialog({
+    required String title,
+    required TextEditingController nombreController,
+    required TextEditingController precioController,
+    required TextEditingController cantidadController,
+    required VoidCallback onSave,
+  }) {
+    return AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildTextField(nombreController, 'Nombre'),
+          _buildTextField(precioController, 'Precio',
+              keyboardType: TextInputType.number),
+          _buildTextField(cantidadController, 'Cantidad',
+              keyboardType: TextInputType.number),
+        ],
+      ),
+      actions: [
+        ElevatedButton(onPressed: onSave, child: Text('Guardar')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('Cancelar'),
+        ),
+      ],
+    );
+  }
+
+  TextField _buildTextField(TextEditingController controller, String label,
       {TextInputType? keyboardType}) {
     return TextField(
       controller: controller,
       decoration: InputDecoration(labelText: label),
       keyboardType: keyboardType,
     );
+  }
+
+  void _showSnackbar(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }

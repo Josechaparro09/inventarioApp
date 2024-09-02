@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:inventario/pantallas/PantallaConfiguracion/pantalla_configuracion.dart';
 import 'package:inventario/pantallas/inventario/pantalla_inventario.dart';
+import 'package:inventario/pantallas/pantalla_principal.dart';
+import 'package:inventario/pantallas/autenticacion/pantalla_login.dart';
+import 'package:inventario/pantallas/autenticacion/pantalla_registro.dart';
 import 'firebase_options.dart';
-import 'pantallas/autenticacion/pantalla_login.dart';
-import 'pantallas/pantalla_principal.dart';
-import 'pantallas/autenticacion/pantalla_registro.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,12 +24,12 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       debugShowCheckedModeBanner: false,
-      initialRoute: '/',
+      home: PantallaLogin(), // Puedes definir la pantalla inicial aquí
       routes: {
-        '/': (context) => PantallaLogin(),
         '/principal': (context) => PantallaPrincipal(),
         '/registro': (context) => PantallaRegistro(),
-        '/pantalla ': (context) => PantallaInventario(),
+        '/inventario': (context) => PantallaInventario(),
+        '/configuracion': (context) => PantallaConfiguracion(),
       },
     );
   }

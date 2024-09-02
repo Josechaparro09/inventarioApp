@@ -17,12 +17,157 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFFF8E1),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLogo(),
+                const SizedBox(height: 40),
+                _buildEmailField(),
+                const SizedBox(height: 20),
+                _buildPasswordField(),
+                const SizedBox(height: 20),
+                _buildConfirmPasswordField(),
+                const SizedBox(height: 30),
+                _buildRegisterButton(),
+                const SizedBox(height: 20),
+                _buildLoginButton(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Image.asset(
+      'assets/images/logo.png',
+      height: 200,
+    );
+  }
+
+  TextField _buildEmailField() {
+    return TextField(
+      controller: _emailController,
+      decoration: _buildInputDecoration(
+        labelText: 'Correo Electrónico',
+        icon: Icons.email,
+      ),
+    );
+  }
+
+  TextField _buildPasswordField() {
+    return TextField(
+      controller: _passwordController,
+      decoration: _buildInputDecoration(
+        labelText: 'Contraseña',
+        icon: Icons.lock,
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+            color: const Color(0xFFFFA726),
+          ),
+          onPressed: _togglePasswordVisibility,
+        ),
+      ),
+      obscureText: _obscurePassword,
+    );
+  }
+
+  TextField _buildConfirmPasswordField() {
+    return TextField(
+      controller: _confirmPasswordController,
+      decoration: _buildInputDecoration(
+        labelText: 'Confirmar Contraseña',
+        icon: Icons.lock,
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+            color: const Color(0xFFFFA726),
+          ),
+          onPressed: _toggleConfirmPasswordVisibility,
+        ),
+      ),
+      obscureText: _obscureConfirmPassword,
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required String labelText,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      filled: true,
+      fillColor: Colors.white,
+      prefixIcon: Icon(icon, color: const Color(0xFFFFA726)),
+      suffixIcon: suffixIcon,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+    );
+  }
+
+  Widget _buildRegisterButton() {
+    return _isLoading
+        ? const CircularProgressIndicator()
+        : ElevatedButton(
+            onPressed: _registrarUsuario,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: const Color(0xFFFFA726),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Center(
+              child: Text(
+                'Registrar',
+                style: TextStyle(fontSize: 18, color: Colors.white),
+              ),
+            ),
+          );
+  }
+
+  Widget _buildLoginButton() {
+    return TextButton(
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PantallaLogin()),
+      ),
+      child: const Text(
+        '¿Ya tienes una cuenta? Inicia Sesión',
+        style: TextStyle(color: Color(0xFFFFA726)),
+      ),
+    );
+  }
+
+  void _togglePasswordVisibility() {
+    setState(() {
+      _obscurePassword = !_obscurePassword;
+    });
+  }
+
+  void _toggleConfirmPasswordVisibility() {
+    setState(() {
+      _obscureConfirmPassword = !_obscureConfirmPassword;
+    });
+  }
+
   Future<void> _registrarUsuario() async {
     if (_passwordController.text.trim() !=
         _confirmPasswordController.text.trim()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Las contraseñas no coinciden')),
-      );
+      _showErrorSnackBar('Las contraseñas no coinciden');
       return;
     }
 
@@ -31,23 +176,15 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     });
 
     try {
-      UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
+      await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registro exitoso')),
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => PantallaLogin()),
-      );
+      _showSuccessSnackBar('Registro exitoso');
+      _navigateToLogin();
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+      _showErrorSnackBar('Error: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -55,139 +192,20 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFFFF8E1), // Fondo en color crema
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo
-                Image.asset(
-                  'assets/images/logo.png',
-                  height: 200,
-                ),
-                SizedBox(height: 40),
-                // Campo de email
-                TextField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: 'Correo Electrónico',
-                    filled: true,
-                    fillColor: Colors.white,
-                    prefixIcon: Icon(Icons.email, color: Color(0xFFFFA726)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20),
-                // Campo de contraseña
-                TextField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Contraseña',
-                    filled: true,
-                    fillColor: Colors.white,
-                    prefixIcon: Icon(Icons.lock, color: Color(0xFFFFA726)),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                        color: Color(0xFFFFA726),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  obscureText: _obscurePassword,
-                ),
-                SizedBox(height: 20),
-                // Campo de confirmar contraseña
-                TextField(
-                  controller: _confirmPasswordController,
-                  decoration: InputDecoration(
-                    labelText: 'Confirmar Contraseña',
-                    filled: true,
-                    fillColor: Colors.white,
-                    prefixIcon: Icon(Icons.lock, color: Color(0xFFFFA726)),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                        color: Color(0xFFFFA726),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureConfirmPassword = !_obscureConfirmPassword;
-                        });
-                      },
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  obscureText: _obscureConfirmPassword,
-                ),
-                SizedBox(height: 30),
-                // Botón de registro
-                _isLoading
-                    ? CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: _registrarUsuario,
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Color(0xFFFFA726),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Registrar',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                SizedBox(height: 20),
-                // Botón para regresar al login
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => PantallaLogin()),
-                    );
-                  },
-                  child: Text(
-                    '¿Ya tienes una cuenta? Inicia Sesión',
-                    style: TextStyle(
-                      color: Color(0xFFFFA726),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _navigateToLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => PantallaLogin()),
     );
   }
 }

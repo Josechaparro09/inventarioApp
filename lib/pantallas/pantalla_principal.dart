@@ -1,15 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:inventario/pantallas/PantallaConfiguracion/pantalla_configuracion.dart';
 import 'inventario/pantalla_inventario.dart';
 import 'ventas/pantalla_ventas.dart';
 import 'registro_ventas/pantalla_registro_ventas.dart'; // Importa la nueva pantalla
 import 'package:firebase_auth/firebase_auth.dart';
 import 'autenticacion/pantalla_login.dart';
+// Asegúrate de importar la pantalla de configuración
 
-class PantallaPrincipal extends StatelessWidget {
+class PantallaPrincipal extends StatefulWidget {
+  @override
+  _PantallaPrincipalState createState() => _PantallaPrincipalState();
+}
+
+class _PantallaPrincipalState extends State<PantallaPrincipal> {
+  User? usuarioActual;
+
+  @override
+  void initState() {
+    super.initState();
+    usuarioActual = FirebaseAuth.instance.currentUser;
+    FirebaseAuth.instance.userChanges().listen((User? user) {
+      setState(() {
+        usuarioActual = user;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    User? usuarioActual = FirebaseAuth.instance.currentUser;
-
     return Scaffold(
       backgroundColor: Color(0xFFFFF8E1), // Fondo en color crema
       appBar: AppBar(
@@ -40,7 +58,11 @@ class PantallaPrincipal extends StatelessWidget {
               title: Text('Configuración'),
               onTap: () {
                 Navigator.pop(context);
-                // Implementar navegación a configuración si existe
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => PantallaConfiguracion()),
+                );
               },
             ),
             ListTile(
@@ -174,7 +196,7 @@ class PantallaPrincipal extends StatelessWidget {
                 },
                 child: Container(
                   padding: EdgeInsets.all(16),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(Icons.receipt, size: 50, color: Color(0xFFFFA726)),
                       SizedBox(width: 16),
