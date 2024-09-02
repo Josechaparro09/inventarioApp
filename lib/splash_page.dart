@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:inventario/pantallas/autenticacion/pantalla_login.dart';
 import 'package:inventario/pantallas/pantalla_principal.dart';
-import 'package:inventario/screens/login_screen.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -18,30 +18,41 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _redirect() async {
+    await Future.delayed(Duration(
+        seconds: 2)); // Añade un pequeño retraso para mostrar el splash
+
+    if (!mounted) return;
+
     try {
       final session = FirebaseAuth.instance.currentUser;
       if (session != null) {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => PantallaPrincipal()),
         );
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => LoginScreen()),
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => PantallaLogin()),
         );
       }
     } catch (e) {
-      if (mounted) SnackBar(content: Text(e.toString()));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
-        child: CircularProgressIndicator(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 20),
+            Text('Cargando...', style: TextStyle(fontSize: 18)),
+          ],
+        ),
       ),
     );
   }
