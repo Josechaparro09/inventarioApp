@@ -3,8 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:inventario/pantallas/PantallaConfiguracion/pantalla_configuracion.dart';
 import 'package:inventario/pantallas/inventario/pantalla_inventario.dart';
 import 'package:inventario/pantallas/pantalla_principal.dart';
-import 'package:inventario/pantallas/autenticacion/pantalla_login.dart';
 import 'package:inventario/pantallas/autenticacion/pantalla_registro.dart';
+import 'package:inventario/splash_page.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -12,10 +12,12 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -24,7 +26,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       debugShowCheckedModeBanner: false,
-      home: PantallaLogin(), // Puedes definir la pantalla inicial aquí
+      home: const SplashPage(), // Puedes definir la pantalla inicial aquí
       routes: {
         '/principal': (context) => PantallaPrincipal(),
         '/registro': (context) => PantallaRegistro(),
