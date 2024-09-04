@@ -18,6 +18,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   cloud_firestore: ^4.0.3
   intl: ^0.18.0
+  pdf: ^3.5.0
+  path_provider: ^2.0.11 # Para guardar el archivo en el dispositivo
 
   # Add other dependencies as required by your project
   # Example:

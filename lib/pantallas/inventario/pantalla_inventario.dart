@@ -1,7 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../modelos/producto.dart';
+import '../../logica/logica_inventario.dart';
 
 class PantallaInventario extends StatefulWidget {
   @override
@@ -9,76 +10,144 @@ class PantallaInventario extends StatefulWidget {
 }
 
 class _PantallaInventarioState extends State<PantallaInventario> {
-  final String usuario = FirebaseAuth.instance.currentUser?.uid ?? '';
+  late LogicaInventario _logicaInventario;
+  final TextEditingController _controladorBusqueda = TextEditingController();
+  String _terminoBusqueda = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final String usuario = FirebaseAuth.instance.currentUser?.uid ?? '';
+    _logicaInventario = LogicaInventario(usuario);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _buildAppBar(),
-      body: _buildBody(),
-      floatingActionButton: _buildAddProductButton(),
+      appBar: _construirAppBar(),
+      body: _construirCuerpo(),
+      floatingActionButton: _construirBotonAgregarProducto(),
       backgroundColor: Color(0xFFFFF8E1),
     );
   }
 
-  AppBar _buildAppBar() {
+  AppBar _construirAppBar() {
     return AppBar(
       title: Text('Inventario'),
       backgroundColor: Color(0xFFFFA726),
     );
   }
 
-  Widget _buildBody() {
-    return StreamBuilder(
-      stream: _getProductStream(),
-      builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-        if (snapshot.hasError) {
-          return _buildErrorMessage(snapshot.error);
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingIndicator();
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyInventoryMessage();
-        }
-        return _buildProductList(snapshot.data!.docs);
-      },
+  Widget _construirCuerpo() {
+    return Column(
+      children: [
+        BarraBusqueda(),
+        Expanded(
+          child: StreamBuilder(
+            stream: _obtenerStreamProductos(),
+            builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+              if (snapshot.hasError) {
+                return _mostrarMensajeError(snapshot.error);
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _mostrarIndicadorCarga();
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return _mostrarMensajeInventarioVacio();
+              }
+              return _construirListaProductos(snapshot.data!.docs);
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  Stream<QuerySnapshot> _getProductStream() {
-    return FirebaseFirestore.instance
-        .collection('productos')
-        .where('usuario', isEqualTo: usuario)
-        .snapshots();
+  Padding BarraBusqueda() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _controladorBusqueda,
+          decoration: InputDecoration(
+            hintText: 'Buscar producto...',
+            border: InputBorder.none,
+            prefixIcon: Icon(Icons.search, color: Color(0xFFFFA726)),
+            contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          ),
+          onChanged: (valor) {
+            setState(() {
+              _terminoBusqueda = valor.toLowerCase();
+            });
+          },
+        ),
+      ),
+    );
   }
 
-  Widget _buildErrorMessage(Object? error) {
+  Stream<QuerySnapshot> _obtenerStreamProductos() {
+    return _logicaInventario.getProductStream();
+  }
+
+  Widget _mostrarMensajeError(Object? error) {
     return Center(
       child: Text('Error al cargar el inventario: $error'),
     );
   }
 
-  Widget _buildLoadingIndicator() {
+  Widget _mostrarIndicadorCarga() {
     return Center(child: CircularProgressIndicator());
   }
 
-  Widget _buildEmptyInventoryMessage() {
+  Widget _mostrarMensajeInventarioVacio() {
     return Center(child: Text('No hay productos en el inventario.'));
   }
 
-  Widget _buildProductList(List<DocumentSnapshot> documents) {
+  Widget _construirListaProductos(List<DocumentSnapshot> documentos) {
+    // Filtrar los productos según el término de búsqueda
+    final documentosFiltrados = documentos.where((doc) {
+      final producto = _convertirAProducto(doc);
+      return producto.nombre.toLowerCase().contains(_terminoBusqueda);
+    }).toList();
+
+    // Mostrar un mensaje si no hay productos que coincidan con la búsqueda
+    if (documentosFiltrados.isEmpty) {
+      return Center(
+        child: Text(
+          'no existe el producto buscado',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(8.0),
-      children: documents.map((doc) => _buildProductCard(doc)).toList(),
+      children: documentosFiltrados
+          .map((doc) => _construirTarjetaProducto(doc))
+          .toList(),
     );
   }
 
-  Card _buildProductCard(DocumentSnapshot doc) {
-    final producto = _convertToProducto(doc);
+  Producto _convertirAProducto(DocumentSnapshot doc) {
+    return _logicaInventario.convertToProducto(doc);
+  }
+
+  Card _construirTarjetaProducto(DocumentSnapshot doc) {
+    final producto = _convertirAProducto(doc);
 
     if (producto.cantidad <= 5) {
-      _showLowStockAlert(producto.nombre);
+      _mostrarAlertaStockBajo(producto.nombre);
     }
 
     return Card(
@@ -97,31 +166,21 @@ class _PantallaInventarioState extends State<PantallaInventario> {
             color: Color(0xFF212121),
           ),
         ),
-        subtitle: _buildProductDetails(producto),
-        trailing: _buildActionButtons(producto),
+        subtitle: _construirDetallesProducto(producto),
+        trailing: _construirBotonesAccion(producto),
       ),
     );
   }
 
-  Producto _convertToProducto(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return Producto(
-      id: doc.id,
-      nombre: data['nombre'],
-      precio: data['precio'].toDouble(),
-      cantidad: data['cantidad'],
-    );
-  }
-
-  void _showLowStockAlert(String productName) {
+  void _mostrarAlertaStockBajo(String nombreProducto) {
     Future.delayed(Duration.zero, () {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('¡Alerta! Stock bajo para $productName')),
+        SnackBar(content: Text('¡Alerta! Stock bajo para $nombreProducto')),
       );
     });
   }
 
-  Column _buildProductDetails(Producto producto) {
+  Column _construirDetallesProducto(Producto producto) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -135,158 +194,156 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     );
   }
 
-  Row _buildActionButtons(Producto producto) {
+  Row _construirBotonesAccion(Producto producto) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           icon: Icon(Icons.edit, color: Color(0xFF42A5F5)),
-          onPressed: () => _editProduct(producto),
+          onPressed: () => _editarProducto(producto),
         ),
         IconButton(
           icon: Icon(Icons.delete, color: Colors.redAccent),
-          onPressed: () => _deleteProduct(producto.id),
+          onPressed: () => _eliminarProducto(producto.id),
         ),
       ],
     );
   }
 
-  FloatingActionButton _buildAddProductButton() {
+  FloatingActionButton _construirBotonAgregarProducto() {
     return FloatingActionButton(
-      onPressed: _showAddProductDialog,
+      onPressed: _mostrarDialogoAgregarProducto,
       child: Icon(Icons.add),
       backgroundColor: Color(0xFFFFA726),
     );
   }
 
-  Future<void> _deleteProduct(String productId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('productos')
-          .doc(productId)
-          .delete();
-      _showSnackbar('Producto eliminado con éxito');
-    } catch (e) {
-      _showSnackbar('Error al eliminar producto: $e');
-    }
-  }
-
-  void _editProduct(Producto producto) {
-    final _nombreController = TextEditingController(text: producto.nombre);
-    final _precioController =
+  void _editarProducto(Producto producto) {
+    final _controladorNombre = TextEditingController(text: producto.nombre);
+    final _controladorPrecio =
         TextEditingController(text: producto.precio.toString());
-    final _cantidadController =
+    final _controladorCantidad =
         TextEditingController(text: producto.cantidad.toString());
 
     showDialog(
       context: context,
       builder: (context) {
-        return _buildProductDialog(
-          title: 'Editar Producto',
-          nombreController: _nombreController,
-          precioController: _precioController,
-          cantidadController: _cantidadController,
-          onSave: () => _updateProduct(producto.id, _nombreController.text,
-              _precioController.text, _cantidadController.text),
+        return AlertDialog(
+          title: Text('Editar Producto'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _construirCampoTexto(_controladorNombre, 'Nombre'),
+              _construirCampoTexto(_controladorPrecio, 'Precio',
+                  keyboardType: TextInputType.number),
+              _construirCampoTexto(_controladorCantidad, 'Cantidad',
+                  keyboardType: TextInputType.number),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => _actualizarProducto(
+                  producto.id,
+                  _controladorNombre.text,
+                  _controladorPrecio.text,
+                  _controladorCantidad.text),
+              child: Text('Guardar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancelar'),
+            ),
+          ],
         );
       },
     );
   }
 
-  Future<void> _updateProduct(
-      String productId, String nombre, String precio, String cantidad) async {
+  Future<void> _actualizarProducto(
+      String idProducto, String nombre, String precio, String cantidad) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('productos')
-          .doc(productId)
-          .update({
-        'nombre': nombre,
-        'precio': double.parse(precio),
-        'cantidad': int.parse(cantidad),
-      });
-      _showSnackbar('Producto actualizado con éxito');
-      Navigator.of(context).pop(); // Cerrar el diálogo
+      await _logicaInventario.updateProduct(
+          idProducto, nombre, precio, cantidad);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Producto actualizado con éxito')),
+      );
+      Navigator.of(context).pop();
     } catch (e) {
-      _showSnackbar('Error al actualizar producto: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar producto: $e')),
+      );
     }
   }
 
-  Future<void> _showAddProductDialog() async {
-    final _nombreController = TextEditingController();
-    final _precioController = TextEditingController();
-    final _cantidadController = TextEditingController();
+  Future<void> _eliminarProducto(String idProducto) async {
+    try {
+      await _logicaInventario.deleteProduct(idProducto);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Producto eliminado con éxito')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar producto: $e')),
+      );
+    }
+  }
+
+  Future<void> _mostrarDialogoAgregarProducto() async {
+    final _controladorNombre = TextEditingController();
+    final _controladorPrecio = TextEditingController();
+    final _controladorCantidad = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) {
-        return _buildProductDialog(
-          title: 'Agregar Producto',
-          nombreController: _nombreController,
-          precioController: _precioController,
-          cantidadController: _cantidadController,
-          onSave: () => _addProduct(_nombreController.text,
-              _precioController.text, _cantidadController.text),
+        return AlertDialog(
+          title: Text('Agregar Producto'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _construirCampoTexto(_controladorNombre, 'Nombre'),
+              _construirCampoTexto(_controladorPrecio, 'Precio'),
+              _construirCampoTexto(_controladorCantidad, 'Cantidad'),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => _agregarProducto(_controladorNombre.text,
+                  _controladorPrecio.text, _controladorCantidad.text),
+              child: Text('Guardar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancelar'),
+            ),
+          ],
         );
       },
     );
   }
 
-  Future<void> _addProduct(
+  Future<void> _agregarProducto(
       String nombre, String precio, String cantidad) async {
     try {
-      await FirebaseFirestore.instance.collection('productos').add({
-        'nombre': nombre,
-        'precio': double.parse(precio),
-        'cantidad': int.parse(cantidad),
-        'usuario': usuario, // Asociar el producto al usuario actual
-      });
-      _showSnackbar('Producto agregado con éxito');
-      Navigator.of(context).pop(); // Cerrar el diálogo
+      await _logicaInventario.addProduct(nombre, precio, cantidad);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Producto agregado con éxito')),
+      );
+      Navigator.of(context).pop();
     } catch (e) {
-      _showSnackbar('Error al agregar producto: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al agregar producto: $e')),
+      );
     }
   }
 
-  AlertDialog _buildProductDialog({
-    required String title,
-    required TextEditingController nombreController,
-    required TextEditingController precioController,
-    required TextEditingController cantidadController,
-    required VoidCallback onSave,
-  }) {
-    return AlertDialog(
-      title: Text(title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildTextField(nombreController, 'Nombre'),
-          _buildTextField(precioController, 'Precio',
-              keyboardType: TextInputType.number),
-          _buildTextField(cantidadController, 'Cantidad',
-              keyboardType: TextInputType.number),
-        ],
-      ),
-      actions: [
-        ElevatedButton(onPressed: onSave, child: Text('Guardar')),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancelar'),
-        ),
-      ],
-    );
-  }
-
-  TextField _buildTextField(TextEditingController controller, String label,
+  TextField _construirCampoTexto(
+      TextEditingController controlador, String etiqueta,
       {TextInputType? keyboardType}) {
     return TextField(
-      controller: controller,
-      decoration: InputDecoration(labelText: label),
+      controller: controlador,
+      decoration: InputDecoration(labelText: etiqueta),
       keyboardType: keyboardType,
     );
-  }
-
-  void _showSnackbar(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
   }
 }

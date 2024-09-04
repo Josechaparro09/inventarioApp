@@ -18,8 +18,8 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _redirect() async {
-    await Future.delayed(Duration(
-        seconds: 2)); // Añade un pequeño retraso para mostrar el splash
+    await Future.delayed(const Duration(
+        seconds: 1)); // Añade un pequeño retraso para mostrar el splash
 
     if (!mounted) return;
 
@@ -43,7 +43,7 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../modelos/producto.dart';
+import '../../logica/logica_ventas.dart';
 
 class PantallaVentas extends StatefulWidget {
   const PantallaVentas({super.key});
@@ -11,49 +12,92 @@ class PantallaVentas extends StatefulWidget {
 }
 
 class _PantallaVentasState extends State<PantallaVentas> {
+  late LogicaVentas _logicaVentas;
   final Map<Producto, int> productosSeleccionados = {};
-  final TextEditingController _cantidadController = TextEditingController();
+  final TextEditingController _controladorCantidad = TextEditingController();
+  final TextEditingController _controladorBusqueda = TextEditingController();
+  String _terminoBusqueda = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final String usuario = FirebaseAuth.instance.currentUser!.uid;
+    _logicaVentas = LogicaVentas(usuario);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8E1),
-      appBar: _buildAppBar(),
-      body: _buildBody(),
+      appBar: _construirAppBar(),
+      body: _construirCuerpo(),
     );
   }
 
-  AppBar _buildAppBar() {
+  AppBar _construirAppBar() {
     return AppBar(
       title: const Text('Ventas'),
       backgroundColor: const Color(0xFFFFA726),
     );
   }
 
-  Widget _buildBody() {
-    final usuario = FirebaseAuth.instance.currentUser!.uid;
-
+  Widget _construirCuerpo() {
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProductList(usuario),
+            _construirBarraBusqueda(),
+            _construirListaProductos(),
             const SizedBox(height: 20),
-            if (productosSeleccionados.isNotEmpty) _buildSelectedProducts(),
+            if (productosSeleccionados.isNotEmpty)
+              _construirProductosSeleccionados(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProductList(String usuario) {
+  Padding _construirBarraBusqueda() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _controladorBusqueda,
+          decoration: InputDecoration(
+            hintText: 'Buscar producto...',
+            border: InputBorder.none,
+            prefixIcon: Icon(Icons.search, color: Color(0xFFFFA726)),
+            contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          ),
+          onChanged: (valor) {
+            setState(() {
+              _terminoBusqueda = valor.toLowerCase();
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _construirListaProductos() {
     return StreamBuilder(
-      stream: _getProductStream(usuario),
+      stream: _logicaVentas.getProductStream(),
       builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
         if (snapshot.hasError) {
-          return _buildErrorMessage(snapshot.error);
+          return _construirMensajeError(snapshot.error);
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -62,35 +106,43 @@ class _PantallaVentasState extends State<PantallaVentas> {
           return const Center(
               child: Text('No hay productos disponibles en el inventario.'));
         }
-        return _buildProductCards(snapshot.data!.docs);
+        return _construirTarjetasProductos(snapshot.data!.docs);
       },
     );
   }
 
-  Stream<QuerySnapshot> _getProductStream(String usuario) {
-    return FirebaseFirestore.instance
-        .collection('productos')
-        .where('usuario', isEqualTo: usuario)
-        .snapshots();
-  }
-
-  Widget _buildErrorMessage(Object? error) {
+  Widget _construirMensajeError(Object? error) {
     return Center(child: Text('Error al cargar los productos: $error'));
   }
 
-  Widget _buildProductCards(List<DocumentSnapshot> documents) {
-    final productos = documents.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      return Producto.fromMap(data, doc.id);
+  Widget _construirTarjetasProductos(List<DocumentSnapshot> documentos) {
+    // Filtrar los productos según el término de búsqueda
+    final productosFiltrados = documentos.where((doc) {
+      final producto =
+          Producto.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      return producto.nombre.toLowerCase().contains(_terminoBusqueda);
     }).toList();
 
+    // Mostrar un mensaje si no hay productos que coincidan con la búsqueda
+    if (productosFiltrados.isEmpty) {
+      return Center(
+        child: Text(
+          'no existe ningún producto búsqueda',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
     return Column(
-      children:
-          productos.map((producto) => _buildProductCard(producto)).toList(),
+      children: productosFiltrados.map((doc) {
+        final producto =
+            Producto.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+        return _construirTarjetaProducto(producto);
+      }).toList(),
     );
   }
 
-  Card _buildProductCard(Producto producto) {
+  Card _construirTarjetaProducto(Producto producto) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
       elevation: 8,
@@ -106,13 +158,13 @@ class _PantallaVentasState extends State<PantallaVentas> {
               fontWeight: FontWeight.bold,
               color: Color(0xFF212121)),
         ),
-        subtitle: _buildProductDetails(producto),
-        trailing: _buildTrailingIcon(producto),
+        subtitle: _construirDetallesProducto(producto),
+        trailing: _construirIconoAccion(producto),
       ),
     );
   }
 
-  Column _buildProductDetails(Producto producto) {
+  Column _construirDetallesProducto(Producto producto) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -128,7 +180,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
     );
   }
 
-  IconButton _buildTrailingIcon(Producto producto) {
+  IconButton _construirIconoAccion(Producto producto) {
     return productosSeleccionados.containsKey(producto)
         ? IconButton(
             icon: const Icon(Icons.remove_circle, color: Colors.red),
@@ -136,11 +188,11 @@ class _PantallaVentasState extends State<PantallaVentas> {
           )
         : IconButton(
             icon: const Icon(Icons.add_circle, color: Color(0xFFFFA726)),
-            onPressed: () => _showAddQuantityDialog(producto),
+            onPressed: () => _mostrarDialogoCantidad(producto),
           );
   }
 
-  Widget _buildSelectedProducts() {
+  Widget _construirProductosSeleccionados() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -150,15 +202,15 @@ class _PantallaVentasState extends State<PantallaVentas> {
         ),
         const SizedBox(height: 10),
         ...productosSeleccionados.entries
-            .map((entry) => _buildSelectedProductTile(entry))
+            .map((entry) => _construirProductoSeleccionado(entry))
             .toList(),
         const SizedBox(height: 20),
-        _buildRealizarVentaButton(),
+        _construirBotonRealizarVenta(),
       ],
     );
   }
 
-  ListTile _buildSelectedProductTile(MapEntry<Producto, int> entry) {
+  ListTile _construirProductoSeleccionado(MapEntry<Producto, int> entry) {
     final producto = entry.key;
     final cantidad = entry.value;
 
@@ -172,7 +224,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
     );
   }
 
-  Center _buildRealizarVentaButton() {
+  Center _construirBotonRealizarVenta() {
     return Center(
       child: ElevatedButton(
         onPressed: _realizarVenta,
@@ -190,14 +242,14 @@ class _PantallaVentasState extends State<PantallaVentas> {
     );
   }
 
-  void _showAddQuantityDialog(Producto producto) {
+  void _mostrarDialogoCantidad(Producto producto) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Cantidad a vender'),
           content: TextField(
-            controller: _cantidadController,
+            controller: _controladorCantidad,
             decoration: const InputDecoration(
               labelText: 'Cantidad',
               border: OutlineInputBorder(),
@@ -206,12 +258,12 @@ class _PantallaVentasState extends State<PantallaVentas> {
           ),
           actions: [
             TextButton(
-              onPressed: () => _handleAddProduct(producto),
+              onPressed: () => _agregarProducto(producto),
               child: const Text('Agregar'),
             ),
             TextButton(
               onPressed: () {
-                _cantidadController.clear();
+                _controladorCantidad.clear();
                 Navigator.of(context).pop();
               },
               child: const Text('Cancelar'),
@@ -222,11 +274,11 @@ class _PantallaVentasState extends State<PantallaVentas> {
     );
   }
 
-  void _handleAddProduct(Producto producto) {
-    final cantidad = int.tryParse(_cantidadController.text) ?? 0;
+  void _agregarProducto(Producto producto) {
+    final cantidad = int.tryParse(_controladorCantidad.text) ?? 0;
     if (cantidad > 0) {
       _agregarProductoSeleccionado(producto, cantidad);
-      _cantidadController.clear();
+      _controladorCantidad.clear();
       Navigator.of(context).pop();
     }
   }
@@ -249,89 +301,32 @@ class _PantallaVentasState extends State<PantallaVentas> {
 
   Future<void> _realizarVenta() async {
     if (productosSeleccionados.isEmpty) {
-      _showSnackBar('Por favor selecciona al menos un producto');
+      _mostrarSnackBar('Por favor selecciona al menos un producto');
       return;
     }
 
     try {
-      WriteBatch batch = FirebaseFirestore.instance.batch();
-      await _processBatch(batch);
-      await batch.commit();
-      _showSuccessDialog();
-      _resetAfterSale();
-    } catch (e, stacktrace) {
-      _handleSaleError(e, stacktrace);
+      await _logicaVentas.realizarVenta(productosSeleccionados);
+      _mostrarDialogoExito();
+      _reiniciarDespuesDeVenta();
+    } catch (e) {
+      _manejarErrorVenta(e, StackTrace.current);
     }
   }
 
-  Future<void> _processBatch(WriteBatch batch) async {
-    for (var entry in productosSeleccionados.entries) {
-      final producto = entry.key;
-      final cantidadVendida = entry.value;
-
-      if (producto.id.isEmpty) {
-        throw Exception('El ID del producto no puede estar vacío');
-      }
-
-      DocumentReference productoRef =
-          FirebaseFirestore.instance.collection('productos').doc(producto.id);
-
-      DocumentSnapshot productoSnapshot = await productoRef.get();
-
-      if (!productoSnapshot.exists) {
-        throw Exception("El producto no existe: ${producto.nombre}");
-      }
-
-      int cantidadActual = productoSnapshot['cantidad'];
-
-      if (cantidadActual < cantidadVendida) {
-        throw Exception(
-            "Cantidad insuficiente en inventario para ${producto.nombre}");
-      }
-
-      _actualizarInventario(
-          batch, productoRef, cantidadActual - cantidadVendida);
-      _registrarVenta(batch, producto, cantidadVendida);
-    }
-  }
-
-  void _actualizarInventario(
-      WriteBatch batch, DocumentReference productoRef, int nuevaCantidad) {
-    batch.update(productoRef, {
-      'cantidad': nuevaCantidad,
-    });
-  }
-
-  void _registrarVenta(
-      WriteBatch batch, Producto producto, int cantidadVendida) {
-    double precioFinal = producto.precio * cantidadVendida;
-
-    batch.set(
-      FirebaseFirestore.instance.collection('ventas').doc(),
-      {
-        'idProducto': producto.id,
-        'nombreProducto': producto.nombre,
-        'cantidadVendida': cantidadVendida,
-        'precioFinal': precioFinal,
-        'fechaVenta': Timestamp.now(),
-        'usuario': FirebaseAuth.instance.currentUser!.uid,
-      },
-    );
-  }
-
-  void _resetAfterSale() {
+  void _reiniciarDespuesDeVenta() {
     setState(() {
       productosSeleccionados.clear();
-      _cantidadController.clear();
+      _controladorCantidad.clear();
     });
   }
 
-  void _showSnackBar(String message) {
+  void _mostrarSnackBar(String mensaje) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+        .showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
-  void _showSuccessDialog() {
+  void _mostrarDialogoExito() {
     showDialog(
       context: context,
       builder: (context) {
@@ -351,10 +346,10 @@ class _PantallaVentasState extends State<PantallaVentas> {
     );
   }
 
-  void _handleSaleError(dynamic error, dynamic stacktrace) {
+  void _manejarErrorVenta(dynamic error, StackTrace stacktrace) {
     print("Error al realizar la venta: $error");
     print("Stacktrace: $stacktrace");
 
-    _showSnackBar('Error al realizar la venta: $error\nDetalles: $stacktrace');
+    _mostrarSnackBar('Error al realizar la venta: $error');
   }
 }

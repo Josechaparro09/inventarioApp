@@ -13,30 +13,75 @@ class _PantallaLoginState extends State<PantallaLogin> {
   bool _isLoading = false;
   bool _obscureText = true;
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _login() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      _showErrorSnackBar('Por favor, ingrese email y contraseña.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
+
     try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      Navigator.pushReplacementNamed(context, '/principal');
+
+      if (userCredential.user != null) {
+        Navigator.pushReplacementNamed(context, '/principal');
+      } else {
+        _showErrorSnackBar('Error desconocido al iniciar sesión.');
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage;
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage =
+              'No se encontró un usuario con ese correo electrónico.';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Contraseña incorrecta.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'El formato del correo electrónico es inválido.';
+          break;
+        case 'user-disabled':
+          errorMessage = 'Esta cuenta ha sido deshabilitada.';
+          break;
+        default:
+          errorMessage = 'Ocurrió un error al iniciar sesión: ${e.message}';
+      }
+      _showErrorSnackBar(errorMessage);
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+      _showErrorSnackBar('Error inesperado: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFFFF8E1), // Fondo en color crema
+      backgroundColor: Color(0xFFFFF8E1),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -44,13 +89,11 @@ class _PantallaLoginState extends State<PantallaLogin> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
                 Image.asset(
                   'assets/images/logo.png',
                   height: 200,
                 ),
                 SizedBox(height: 40),
-                // Campo de email
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
@@ -65,9 +108,9 @@ class _PantallaLoginState extends State<PantallaLogin> {
                   ),
                 ),
                 SizedBox(height: 20),
-                // Campo de contraseña
                 TextField(
                   controller: _passwordController,
+                  obscureText: _obscureText,
                   decoration: InputDecoration(
                     labelText: 'Contraseña',
                     filled: true,
@@ -89,10 +132,8 @@ class _PantallaLoginState extends State<PantallaLogin> {
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  obscureText: _obscureText,
                 ),
                 SizedBox(height: 30),
-                // Botón de inicio de sesión
                 _isLoading
                     ? CircularProgressIndicator()
                     : ElevatedButton(
@@ -115,7 +156,6 @@ class _PantallaLoginState extends State<PantallaLogin> {
                         ),
                       ),
                 SizedBox(height: 20),
-                // Botón de registro
                 TextButton(
                   onPressed: () {
                     Navigator.pushNamed(context, '/registro');
