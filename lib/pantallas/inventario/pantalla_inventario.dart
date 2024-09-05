@@ -27,21 +27,29 @@ class _PantallaInventarioState extends State<PantallaInventario> {
       appBar: _construirAppBar(),
       body: _construirCuerpo(),
       floatingActionButton: _construirBotonAgregarProducto(),
-      backgroundColor: Color(0xFFFFF8E1),
+      backgroundColor: const Color(0xFFFFF8E1),
     );
   }
 
   AppBar _construirAppBar() {
     return AppBar(
-      title: Text('Inventario'),
-      backgroundColor: Color(0xFFFFA726),
+      title: const Text(
+        'Inventario',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 24,
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: const Color(0xFFFFA726),
+      elevation: 0,
     );
   }
 
   Widget _construirCuerpo() {
     return Column(
       children: [
-        BarraBusqueda(),
+        _construirBarraBusqueda(),
         Expanded(
           child: StreamBuilder(
             stream: _obtenerStreamProductos(),
@@ -63,28 +71,29 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     );
   }
 
-  Padding BarraBusqueda() {
+  Padding _construirBarraBusqueda() {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: const [
             BoxShadow(
               color: Colors.black12,
-              blurRadius: 6,
-              offset: Offset(0, 2),
+              blurRadius: 8,
+              offset: Offset(0, 4),
             ),
           ],
         ),
         child: TextField(
           controller: _controladorBusqueda,
-          decoration: InputDecoration(
-            hintText: 'Buscar producto...',
+          decoration: const InputDecoration(
+            hintText: 'Buscar productos...',
             border: InputBorder.none,
             prefixIcon: Icon(Icons.search, color: Color(0xFFFFA726)),
-            contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           ),
           onChanged: (valor) {
             setState(() {
@@ -107,35 +116,42 @@ class _PantallaInventarioState extends State<PantallaInventario> {
   }
 
   Widget _mostrarIndicadorCarga() {
-    return Center(child: CircularProgressIndicator());
+    return const Center(child: CircularProgressIndicator());
   }
 
   Widget _mostrarMensajeInventarioVacio() {
-    return Center(child: Text('No hay productos en el inventario.'));
+    return const Center(
+      child: Text(
+        'No hay productos en el inventario.',
+        style: TextStyle(
+          fontSize: 18,
+          color: Colors.grey,
+        ),
+      ),
+    );
   }
 
   Widget _construirListaProductos(List<DocumentSnapshot> documentos) {
-    // Filtrar los productos según el término de búsqueda
     final documentosFiltrados = documentos.where((doc) {
       final producto = _convertirAProducto(doc);
       return producto.nombre.toLowerCase().contains(_terminoBusqueda);
     }).toList();
 
-    // Mostrar un mensaje si no hay productos que coincidan con la búsqueda
     if (documentosFiltrados.isEmpty) {
-      return Center(
+      return const Center(
         child: Text(
-          'no existe el producto buscado',
+          'No existe el producto buscado',
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(8.0),
-      children: documentosFiltrados
-          .map((doc) => _construirTarjetaProducto(doc))
-          .toList(),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      itemCount: documentosFiltrados.length,
+      itemBuilder: (context, index) {
+        return _construirTarjetaProducto(documentosFiltrados[index]);
+      },
     );
   }
 
@@ -143,24 +159,38 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     return _logicaInventario.convertToProducto(doc);
   }
 
-  Card _construirTarjetaProducto(DocumentSnapshot doc) {
+  Widget _construirTarjetaProducto(DocumentSnapshot doc) {
     final producto = _convertirAProducto(doc);
 
     if (producto.cantidad <= 5) {
       _mostrarAlertaStockBajo(producto.nombre);
     }
 
-    return Card(
-      elevation: 8,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.only(bottom: 10.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16.0),
-        leading: Icon(Icons.inventory, color: Color(0xFFFFA726), size: 40),
+        leading: const CircleAvatar(
+          backgroundColor: Color(0xFFFFA726),
+          radius: 25,
+          child: Icon(Icons.inventory, color: Colors.white, size: 30),
+        ),
         title: Text(
           producto.nombre,
-          style: TextStyle(
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
             color: Color(0xFF212121),
@@ -184,12 +214,16 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(height: 8.0),
-        Text('Precio: \$${producto.precio.toStringAsFixed(2)}',
-            style: TextStyle(color: Color(0xFF757575))),
-        SizedBox(height: 4.0),
-        Text('Cantidad: ${producto.cantidad}',
-            style: TextStyle(color: Color(0xFF757575))),
+        const SizedBox(height: 4.0),
+        Text(
+          'Precio: \$${producto.precio.toStringAsFixed(2)}',
+          style: const TextStyle(color: Color(0xFF757575)),
+        ),
+        const SizedBox(height: 4.0),
+        Text(
+          'Cantidad: ${producto.cantidad}',
+          style: const TextStyle(color: Color(0xFF757575)),
+        ),
       ],
     );
   }
@@ -199,11 +233,11 @@ class _PantallaInventarioState extends State<PantallaInventario> {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: Icon(Icons.edit, color: Color(0xFF42A5F5)),
+          icon: const Icon(Icons.edit, color: Color(0xFF42A5F5)),
           onPressed: () => _editarProducto(producto),
         ),
         IconButton(
-          icon: Icon(Icons.delete, color: Colors.redAccent),
+          icon: const Icon(Icons.delete, color: Colors.redAccent),
           onPressed: () => _eliminarProducto(producto.id),
         ),
       ],
@@ -213,8 +247,8 @@ class _PantallaInventarioState extends State<PantallaInventario> {
   FloatingActionButton _construirBotonAgregarProducto() {
     return FloatingActionButton(
       onPressed: _mostrarDialogoAgregarProducto,
-      child: Icon(Icons.add),
-      backgroundColor: Color(0xFFFFA726),
+      child: const Icon(Icons.add),
+      backgroundColor: const Color(0xFFFFA726),
     );
   }
 
@@ -229,7 +263,7 @@ class _PantallaInventarioState extends State<PantallaInventario> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Editar Producto'),
+          title: const Text('Editar Producto'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -247,11 +281,14 @@ class _PantallaInventarioState extends State<PantallaInventario> {
                   _controladorNombre.text,
                   _controladorPrecio.text,
                   _controladorCantidad.text),
-              child: Text('Guardar'),
+              child: const Text('Guardar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFFA726),
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
+              child: const Text('Cancelar'),
             ),
           ],
         );
@@ -265,7 +302,7 @@ class _PantallaInventarioState extends State<PantallaInventario> {
       await _logicaInventario.updateProduct(
           idProducto, nombre, precio, cantidad);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Producto actualizado con éxito')),
+        const SnackBar(content: Text('Producto actualizado con éxito')),
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -279,7 +316,7 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     try {
       await _logicaInventario.deleteProduct(idProducto);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Producto eliminado con éxito')),
+        const SnackBar(content: Text('Producto eliminado con éxito')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -297,24 +334,29 @@ class _PantallaInventarioState extends State<PantallaInventario> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Agregar Producto'),
+          title: const Text('Agregar Producto'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _construirCampoTexto(_controladorNombre, 'Nombre'),
-              _construirCampoTexto(_controladorPrecio, 'Precio'),
-              _construirCampoTexto(_controladorCantidad, 'Cantidad'),
+              _construirCampoTexto(_controladorPrecio, 'Precio',
+                  keyboardType: TextInputType.number),
+              _construirCampoTexto(_controladorCantidad, 'Cantidad',
+                  keyboardType: TextInputType.number),
             ],
           ),
           actions: [
             ElevatedButton(
               onPressed: () => _agregarProducto(_controladorNombre.text,
                   _controladorPrecio.text, _controladorCantidad.text),
-              child: Text('Guardar'),
+              child: const Text('Guardar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFFA726),
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
+              child: const Text('Cancelar'),
             ),
           ],
         );
@@ -327,7 +369,7 @@ class _PantallaInventarioState extends State<PantallaInventario> {
     try {
       await _logicaInventario.addProduct(nombre, precio, cantidad);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Producto agregado con éxito')),
+        const SnackBar(content: Text('Producto agregado con éxito')),
       );
       Navigator.of(context).pop();
     } catch (e) {

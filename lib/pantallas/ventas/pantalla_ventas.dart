@@ -31,6 +31,10 @@ class _PantallaVentasState extends State<PantallaVentas> {
       backgroundColor: const Color(0xFFFFF8E1),
       appBar: _construirAppBar(),
       body: _construirCuerpo(),
+      floatingActionButton: productosSeleccionados.isNotEmpty
+          ? _construirBotonRealizarVenta()
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -94,7 +98,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
 
   Widget _construirListaProductos() {
     return StreamBuilder(
-      stream: _logicaVentas.getProductStream(),
+      stream: _logicaVentas.getProductStream(), // Cambio de método aquí
       builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
         if (snapshot.hasError) {
           return _construirMensajeError(snapshot.error);
@@ -127,7 +131,7 @@ class _PantallaVentasState extends State<PantallaVentas> {
     if (productosFiltrados.isEmpty) {
       return Center(
         child: Text(
-          'no existe ningún producto búsqueda',
+          'No existe ningún producto para la búsqueda',
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       );
@@ -205,7 +209,6 @@ class _PantallaVentasState extends State<PantallaVentas> {
             .map((entry) => _construirProductoSeleccionado(entry))
             .toList(),
         const SizedBox(height: 20),
-        _construirBotonRealizarVenta(),
       ],
     );
   }
@@ -224,21 +227,12 @@ class _PantallaVentasState extends State<PantallaVentas> {
     );
   }
 
-  Center _construirBotonRealizarVenta() {
-    return Center(
-      child: ElevatedButton(
-        onPressed: _realizarVenta,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 15.0),
-          backgroundColor: const Color(0xFFFFA726),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-        ),
-        child: const Text(
-          'Realizar Venta',
-          style: TextStyle(fontSize: 18),
-        ),
-      ),
+  FloatingActionButton _construirBotonRealizarVenta() {
+    return FloatingActionButton.extended(
+      onPressed: _confirmarVenta,
+      label: const Text('Realizar Venta'),
+      icon: const Icon(Icons.shopping_cart, color: Colors.deepPurple),
+      backgroundColor: const Color(0xFFFFA726),
     );
   }
 
@@ -299,6 +293,34 @@ class _PantallaVentasState extends State<PantallaVentas> {
     });
   }
 
+  Future<void> _confirmarVenta() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirmar Venta'),
+          content:
+              const Text('¿Estás seguro de que deseas realizar esta venta?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cancelar la venta
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Confirmar la venta
+                _realizarVenta();
+              },
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _realizarVenta() async {
     if (productosSeleccionados.isEmpty) {
       _mostrarSnackBar('Por favor selecciona al menos un producto');
@@ -307,7 +329,8 @@ class _PantallaVentasState extends State<PantallaVentas> {
 
     try {
       await _logicaVentas.realizarVenta(productosSeleccionados);
-      _mostrarDialogoExito();
+      _mostrarDialogoFactura(productosSeleccionados.values.toList(),
+          productosSeleccionados.keys.toList());
       _reiniciarDespuesDeVenta();
     } catch (e) {
       _manejarErrorVenta(e, StackTrace.current);
@@ -326,13 +349,32 @@ class _PantallaVentasState extends State<PantallaVentas> {
         .showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
-  void _mostrarDialogoExito() {
+  void _mostrarDialogoFactura(List<int> cantidades, List<Producto> productos) {
+    final totalPagar = productos
+        .asMap()
+        .entries
+        .map((e) => e.value.precio * cantidades[e.key])
+        .reduce((value, element) => value + element);
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Venta realizada'),
-          content: const Text('La venta se realizó con éxito.'),
+          title: const Text('Factura de Venta'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Fecha: ${DateTime.now()}'),
+              const SizedBox(height: 8),
+              const Text('Productos vendidos:'),
+              for (var i = 0; i < productos.length; i++)
+                Text(
+                    '${productos[i].nombre} - Cantidad: ${cantidades[i]} - Precio: \$${productos[i].precio.toStringAsFixed(2)}'),
+              const SizedBox(height: 8),
+              Text('Total a pagar: \$${totalPagar.toStringAsFixed(2)}'),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () {

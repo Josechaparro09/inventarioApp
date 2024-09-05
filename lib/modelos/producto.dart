@@ -30,4 +30,6 @@ class Producto {
       cantidad: map['cantidad'] ?? 0,
     );
   }
+
+  static toStringasFixed(int i) {}
 }

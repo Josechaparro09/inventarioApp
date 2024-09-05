@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Importa FirebaseAuth para acceder al usuario actual
 import 'package:intl/intl.dart';
 
 class PantallaRegistroVentas extends StatefulWidget {
@@ -25,15 +24,75 @@ class _PantallaRegistroVentasState extends State<PantallaRegistroVentas> {
     }
   }
 
+  Future<void> _mostrarDialogoVenta(
+      BuildContext context,
+      List<dynamic> nombresProductos, // Ahora utiliza nombres en lugar de IDs
+      List<dynamic> cantidades,
+      double? total,
+      DateTime fechaVenta) async {
+    List<String> detallesProductos = [];
+
+    for (var i = 0; i < nombresProductos.length; i++) {
+      var nombreProducto = nombresProductos[i];
+      var cantidadVendida = cantidades[i];
+
+      // Buscar el producto por su nombre en lugar de ID
+      QuerySnapshot productoSnapshot = await FirebaseFirestore.instance
+          .collection('productos')
+          .where('nombre', isEqualTo: nombreProducto)
+          .limit(1)
+          .get();
+
+      if (productoSnapshot.docs.isNotEmpty) {
+        var productoData =
+            productoSnapshot.docs.first.data() as Map<String, dynamic>;
+        var precioProducto = productoData['precio']?.toDouble() ?? 0.0;
+
+        detallesProductos.add(
+            '$nombreProducto - Cantidad: $cantidadVendida - Precio: \$${precioProducto.toStringAsFixed(2)}');
+      } else {
+        detallesProductos
+            .add('Producto no encontrado - Cantidad: $cantidadVendida');
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Factura de Venta'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                  'Fecha: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(fechaVenta)}'),
+              const SizedBox(height: 8),
+              const Text('Productos vendidos:'),
+              for (var detalle in detallesProductos) Text(detalle),
+              const SizedBox(height: 8),
+              Text('Total a pagar: \$${(total ?? 0.0).toStringAsFixed(2)}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Aceptar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Obtener el ID del usuario actual
-    final String usuarioId = FirebaseAuth.instance.currentUser!.uid;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Registro de Ventas'),
-        backgroundColor: Color(0xFFFFA726),
+        backgroundColor: const Color(0xFFFFA726),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -63,9 +122,6 @@ class _PantallaRegistroVentasState extends State<PantallaRegistroVentas> {
                   : StreamBuilder(
                       stream: FirebaseFirestore.instance
                           .collection('ventas')
-                          .where('usuario',
-                              isEqualTo:
-                                  usuarioId) // Filtrar por usuario actual
                           .where('fechaVenta',
                               isGreaterThanOrEqualTo:
                                   Timestamp.fromDate(_fechaSeleccionada!))
@@ -84,7 +140,8 @@ class _PantallaRegistroVentasState extends State<PantallaRegistroVentas> {
 
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(
+                              child: CircularProgressIndicator());
                         }
 
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -93,15 +150,29 @@ class _PantallaRegistroVentasState extends State<PantallaRegistroVentas> {
                                   'No hay ventas registradas para esta fecha.'));
                         }
 
+                        int ventaContador = 1;
+
                         return ListView(
                           children: snapshot.data!.docs.map((doc) {
                             final data = doc.data() as Map<String, dynamic>;
+                            final nombresProductos =
+                                data['nombresProductos'] ?? [];
+                            final cantidades = data['cantidades'] ?? [];
+                            final total = data['precioFinal']?.toDouble();
+                            final fechaVenta =
+                                (data['fechaVenta'] as Timestamp).toDate();
+
                             return ListTile(
-                              title: Text(data['nombreProducto']),
+                              title: Text(
+                                  'Venta #${ventaContador.toString().padLeft(3, '0')} - Hora: ${DateFormat('HH:mm').format(fechaVenta)}'),
                               subtitle: Text(
-                                  'Cantidad Vendida: ${data['cantidadVendida']}'),
-                              trailing: Text(
-                                  'Total: \$${data['precioFinal'].toStringAsFixed(2)}'),
+                                  'Total: \$${total?.toStringAsFixed(2) ?? "0.00"}'),
+                              onTap: () => _mostrarDialogoVenta(
+                                  context,
+                                  nombresProductos,
+                                  cantidades,
+                                  total,
+                                  fechaVenta),
                             );
                           }).toList(),
                         );
